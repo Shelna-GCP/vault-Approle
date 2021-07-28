@@ -1,0 +1,39 @@
+name: Secret - Test
+
+on: 
+  push:
+    branches:
+      - main
+
+jobs:
+  blackduck-sca-scan:
+    name: "Secret Test"  
+    runs-on: ubuntu-16.04
+
+    env: 
+        ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
+        VAULT_ADDR: <VAULT_URL>
+        VAULT_NAMESPACE: <VAULT_NAMESPACE>
+
+    steps:      
+
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: Install and Get Vault Token
+      shell: bash
+      run: |
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          sudo apt-get update && sudo apt-get install vault
+          
+          vault write auth/approle/login role_id="***************" secret_id="*****************"
+          cmd=$(vault write -format=json auth/approle/login role_id="*******************" secret_id="***************" | jq -r '.auth.client_token')
+          echo "VAULT_TOKEN=$(echo "$cmd")" >> $GITHUB_ENV
+          
+    - name: Read Secrets
+      run: |    
+          json_secrets_str=$(vault kv get -format=json secret/hello | jq -r .data.data)
+          jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' <<< "$json_secrets_str" >> $GITHUB_ENV
+    - run: |
+          echo $foo
+          echo ${{env.test}}
